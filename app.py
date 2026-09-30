@@ -267,12 +267,6 @@ async def GetAccountInformation(uid, region):
             account_info.ParseFromString(resp.content)
             result = json.loads(json_format.MessageToJson(account_info))
 
-            is_banned = result.get("isBanned", False)
-            if isinstance(is_banned, bool):
-                result["ban_status"] = "🔴 BANNED" if is_banned else "🟢 UNBANNED"
-            else:
-                result["ban_status"] = "❓ UNKNOWN"
-
             result["region"] = actual_region
             return result
 
@@ -280,21 +274,18 @@ async def GetAccountInformation(uid, region):
         return None
 
 # =============================================
-# HELPER
+# HELPER FOR DUO & BAN STATUS
 # =============================================
 
-def get_item_name(item_id):
-    if not item_id or item_id == "0" or item_id == 0:
-        return "N/A"
+async def fetch_external_api(url: str):
     try:
-        import requests
-        response = requests.get(f"https://api.danger.workers.dev/item/{item_id}", timeout=3)
-        if response.status_code == 200:
-            data = response.json()
-            return data.get("name", str(item_id))
-        return str(item_id)
-    except:
-        return str(item_id)
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(url)
+            if response.status_code == 200:
+                return response.json()
+    except Exception:
+        pass
+    return None
 
 def ts_to_bst(ts):
     try:
@@ -344,10 +335,21 @@ def get_full_info():
         return None
 
     try:
-        account_data = asyncio.run(try_all_regions_parallel())
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        # Run account fetch and external APIs concurrently
+        account_task = try_all_regions_parallel()
+        duo_task = fetch_external_api(f"https://api-free-fire-dou-info-by-ckrpro.vercel.app/api/duo?uid={uid}")
+        ban_task = fetch_external_api(f"https://amin-team-api.vercel.app/check_banned?player_id={uid}")
+        
+        account_data, duo_data, ban_data = loop.run_until_complete(
+            asyncio.gather(account_task, duo_task, ban_task)
+        )
+        loop.close()
     except Exception as e:
         print(f"❌ Global error: {e}")
-        account_data = None
+        account_data, duo_data, ban_data = None, None, None
 
     if not account_data:
         return jsonify({"error": "Player not found"}), 404
@@ -360,10 +362,29 @@ def get_full_info():
     credit = account_data.get("creditScoreInfo", {})
     captain = account_data.get("captainBasicInfo", {})
 
+    # Ban status resolution
+    ban_status = "UNKNOWN"
+    if ban_data and isinstance(ban_data, dict):
+        ban_status = ban_data.get("status", "UNKNOWN")
+
+    # Duo info formatting
+    formatted_duo = {}
+    if duo_data and isinstance(duo_data, dict) and "data" in duo_data:
+        formatted_duo = duo_data.get("data", {})
+    else:
+        formatted_duo = {
+            "created_on": "N/A",
+            "days_active": "N/A",
+            "duo_level": "N/A",
+            "intimacy_score": 0,
+            "partner_uid": "N/A",
+            "status": "N/A"
+        }
+
     response = {
         "status": "success",
         "server_used": used_region,
-        "BanStatus": account_data.get("ban_status", "❓ UNKNOWN"),
+        "BanStatus": ban_status,
         "BasicInformation": {
             "Name": basic.get("nickname", "N/A"),
             "UID": uid,
@@ -386,6 +407,7 @@ def get_full_info():
             "LeaderUID": captain.get("accountId", "N/A"),
             "LeaderLevel": captain.get("level", "N/A")
         },
+        "DuoInformation": formatted_duo,
         "DeveloperInfo": {
             "Dev": "ckrpro",
             "TikTok": "ckr unknown",
