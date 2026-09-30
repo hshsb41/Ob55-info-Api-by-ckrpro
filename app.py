@@ -34,7 +34,7 @@ MAIN_IV = b'6oyZDr22E3ychjM%'
 # JWT TOKEN API
 # =============================================
 
-JWT_API_BASE = "https://ff-jwt-gen-api.lovable.app/api/public/token"   # Updated JWT API
+JWT_API_BASE = "https://ff-jwt-gen-api.lovable.app/api/public/token"
 
 # =============================================
 # ACCOUNTS FOR JWT
@@ -296,30 +296,6 @@ def get_item_name(item_id):
     except:
         return str(item_id)
 
-def get_rank_name(rp):
-    try:
-        rp = int(rp)
-    except:
-        return "N/A"
-    if rp == 0: return "Bronze I"
-    if rp < 100: return "Bronze II"
-    if rp < 200: return "Bronze III"
-    if rp < 300: return "Silver I"
-    if rp < 400: return "Silver II"
-    if rp < 500: return "Silver III"
-    if rp < 600: return "Gold I"
-    if rp < 700: return "Gold II"
-    if rp < 800: return "Gold III"
-    if rp < 900: return "Platinum I"
-    if rp < 1000: return "Platinum II"
-    if rp < 1100: return "Platinum III"
-    if rp < 1200: return "Diamond I"
-    if rp < 1300: return "Diamond II"
-    if rp < 1400: return "Diamond III"
-    if rp < 1500: return "Heroic"
-    if rp < 2000: return "Master"
-    return "Grandmaster"
-
 def ts_to_bst(ts):
     try:
         dt = datetime.fromtimestamp(int(ts)) + timedelta(hours=6)
@@ -344,7 +320,6 @@ def get_full_info():
         return jsonify({"error": "Invalid UID"}), 400
 
     async def try_all_regions_parallel():
-        """BD, IND, BR — FULL MADE BY JAHID"""
         tasks = []
         for region in REGION_PRIORITY:
             tasks.append(asyncio.create_task(GetAccountInformation(uid_int, region)))
@@ -382,77 +357,39 @@ def get_full_info():
     basic = account_data.get("basicInfo", {})
     clan = account_data.get("clanBasicInfo", {})
     social = account_data.get("socialInfo", {})
-    pet = account_data.get("petInfo", {})
-    captain = account_data.get("captainBasicInfo", {})
     credit = account_data.get("creditScoreInfo", {})
-
-    prime_level = "N/A"
-    try:
-        prime_data = basic.get("primeLevel")
-        if isinstance(prime_data, dict):
-            prime_level = prime_data.get("level", "N/A")
-        elif prime_data is not None:
-            prime_level = str(prime_data)
-    except:
-        prime_level = "N/A"
+    captain = account_data.get("captainBasicInfo", {})
 
     response = {
         "status": "success",
         "server_used": used_region,
         "BanStatus": account_data.get("ban_status", "❓ UNKNOWN"),
         "BasicInformation": {
-            "PrimeLevel": prime_level,
             "Name": basic.get("nickname", "N/A"),
             "UID": uid,
+            "Region": basic.get("region", used_region),
+            "Bio": social.get("signature", "N/A"),
+            "HonorScore": credit.get("creditScore", "N/A"),
             "Level": basic.get("level", "N/A"),
             "Exp": basic.get("exp", "N/A"),
-            "Region": basic.get("region", "N/A"),
-            "Likes": basic.get("liked", "N/A"),
-            "HonorScore": credit.get("creditScore", "N/A"),
-            "CelebrityStatus": "Yes" if basic.get("showBrRank") else "No",
-            "Title": get_item_name(basic.get("title", "0")),
-            "Signature": social.get("signature", "N/A")
-        },
-        "ActivityInformation": {
-            "MostRecentOB": basic.get("releaseVersion", "N/A"),
-            "BooyahPass": "Yes" if basic.get("hasElitePass") else "No",
-            "CurrentBpBadges": basic.get("badgeCnt", "N/A"),
-            "BRRank": get_rank_name(basic.get("rankingPoints", 0)),
-            "BRPoints": basic.get("rankingPoints", 0),
-            "ShowBRRank": "True" if basic.get("showBrRank") else "False",
-            "ShowCSRank": "True" if basic.get("showCsRank") else "False",
-            "CreatedAt": ts_to_bst(basic.get("createAt", 0)),
-            "LastLogin": ts_to_bst(basic.get("lastLoginAt", 0))
+            "CreateDate": ts_to_bst(basic.get("createAt", 0)),
+            "LastLoginDate": ts_to_bst(basic.get("lastLoginAt", 0))
         },
         "GuildInformation": {
             "GuildName": clan.get("clanName", "No Guild"),
             "GuildID": clan.get("clanId", "N/A"),
             "GuildLevel": clan.get("clanLevel", "N/A"),
             "LiveMembers": clan.get("memberNum", "N/A"),
-            "MaxMembers": clan.get("capacity", "N/A")
+            "MaxMembers": clan.get("capacity", "N/A"),
+            "Notice": clan.get("slogan", "N/A"),
+            "LeaderName": captain.get("nickname", "N/A"),
+            "LeaderUID": captain.get("accountId", "N/A"),
+            "LeaderLevel": captain.get("level", "N/A")
         },
-        "PetDetails": {
-            "Equipped": "Yes" if pet.get("isSelected") else "No",
-            "PetNick": pet.get("name", "N/A"),
-            "PetType": get_item_name(pet.get("id", "0")),
-            "PetSkill": get_item_name(pet.get("selectedSkillId", "0")),
-            "PetSkin": get_item_name(pet.get("skinId", "0")),
-            "PetExp": pet.get("exp", "N/A"),
-            "PetLevel": pet.get("level", "N/A")
-        },
-        "LeaderInformation": {
-            "Name": captain.get("nickname", "N/A"),
-            "UID": captain.get("accountId", "N/A"),
-            "Level": captain.get("level", "N/A"),
-            "Region": captain.get("region", "N/A"),
-            "BooyahPass": "Yes" if captain.get("hasElitePass") else "No",
-            "CreatedAt": ts_to_bst(captain.get("createAt", 0)),
-            "LastLogin": ts_to_bst(captain.get("lastLoginAt", 0)),
-            "MostRecentOB": captain.get("releaseVersion", "N/A"),
-            "Title": get_item_name(captain.get("title", "0")),
-            "BpBadges": captain.get("badgeCnt", "N/A"),
-            "BRRank": get_rank_name(captain.get("rankingPoints", 0)),
-            "BRPoints": captain.get("rankingPoints", 0)
+        "DeveloperInfo": {
+            "Dev": "ckrpro",
+            "TikTok": "ckr unknown",
+            "YouTube": "ckr unknown"
         }
     }
 
@@ -466,7 +403,9 @@ def home():
         "endpoint": "/info?uid=UID",
         "example": "/info?uid=2084018498",
         "priority": "BD → IND → BR",
-        "credit": "@Itz_Jahid_X"
+        "Dev": "ckrpro",
+        "TikTok": "ckr unknown",
+        "YouTube": "ckr unknown"
     })
 
 @app.route('/status')
