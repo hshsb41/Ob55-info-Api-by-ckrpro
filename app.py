@@ -338,7 +338,6 @@ def get_full_info():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         
-        # Run account fetch and external APIs concurrently
         account_task = try_all_regions_parallel()
         duo_task = fetch_external_api(f"https://api-free-fire-dou-info-by-ckrpro.vercel.app/api/duo?uid={uid}")
         ban_task = fetch_external_api(f"https://amin-team-api.vercel.app/check_banned?player_id={uid}")
@@ -367,19 +366,13 @@ def get_full_info():
     if ban_data and isinstance(ban_data, dict):
         ban_status = ban_data.get("status", "UNKNOWN")
 
-    # Duo info formatting
-    formatted_duo = {}
-    if duo_data and isinstance(duo_data, dict) and "data" in duo_data:
-        formatted_duo = duo_data.get("data", {})
-    else:
-        formatted_duo = {
-            "created_on": "N/A",
-            "days_active": "N/A",
-            "duo_level": "N/A",
-            "intimacy_score": 0,
-            "partner_uid": "N/A",
-            "status": "N/A"
-        }
+    # Duo info checking
+    formatted_duo = "Duo not found"
+    if duo_data and isinstance(duo_data, dict):
+        # Check if the API successfully returned data block
+        inner_data = duo_data.get("data")
+        if inner_data and isinstance(inner_data, dict) and inner_data.get("partner_uid"):
+            formatted_duo = inner_data
 
     response = {
         "status": "success",
